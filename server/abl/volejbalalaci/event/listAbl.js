@@ -2,7 +2,6 @@ const eventDao = require("../../../dao/volejbalalaci/event-dao.js");
 const attendanceDao = require("../../../dao/volejbalalaci/attendance-dao.js");
 
 async function ListAbl(req, res) {
-  console.log("kuk");
   try {
     const eventList = eventDao.list();
 

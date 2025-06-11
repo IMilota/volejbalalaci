@@ -15,8 +15,6 @@ function EventForm({ setShowEventForm, event }) {
   const [showAlert, setShowAlert] = useState(null);
   const isPending = state === "pending";
 
-  console.log(state);
-
   return (
     <Modal show={true} onHide={() => setShowEventForm(false)}>
       <Form
