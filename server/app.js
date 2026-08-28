@@ -2,6 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const { connectDb } = require("./db/connect");
 
 // volejbalalaci
 const eventController = require("./controller/volejbalalaci/event");
@@ -30,7 +31,14 @@ app.use("/api/volejbalalaci/user", userController);
 app.use("/api/volejbalalaci/attendance", attendanceController);
 app.use("/api/volejbalalaci/message", messageController);
 
-//nastavení portu, na kterém má běžet HTTP server
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`);
+async function start() {
+  await connectDb();
+  app.listen(port, () => {
+    console.log(`Example app listening at http://localhost:${port}`);
+  });
+}
+
+start().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });
