@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const { connectDb } = require("./db/connect");
+const { seedAdmin } = require("./db/seed-admin");
 
 // volejbalalaci
 const eventController = require("./controller/volejbalalaci/event");
@@ -33,6 +34,7 @@ app.use("/api/volejbalalaci/message", messageController);
 
 async function start() {
   await connectDb();
+  await seedAdmin();
   app.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`);
   });
