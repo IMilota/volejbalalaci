@@ -58,4 +58,41 @@ describe("auth models", () => {
     });
     assert.equal(await Session.countDocuments({ userId: user._id }), 2);
   });
+
+  it("rejects a second Session with the same tokenHash", async () => {
+    const tokenHash = hashToken("dup-session");
+    await Session.create({
+      userId: user._id,
+      tokenHash,
+      lastUsedAt: new Date(),
+    });
+    await assert.rejects(
+      () =>
+        Session.create({
+          userId: user._id,
+          tokenHash,
+          lastUsedAt: new Date(),
+        }),
+      { name: "MongoServerError" }
+    );
+  });
+
+  it("rejects a second LoginChallenge with the same tokenHash", async () => {
+    const tokenHash = hashToken("dup-challenge");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await LoginChallenge.create({
+      userId: user._id,
+      tokenHash,
+      expiresAt,
+    });
+    await assert.rejects(
+      () =>
+        LoginChallenge.create({
+          userId: user._id,
+          tokenHash,
+          expiresAt,
+        }),
+      { name: "MongoServerError" }
+    );
+  });
 });

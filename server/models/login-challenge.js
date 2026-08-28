@@ -10,7 +10,7 @@ function toJsonTransform(_doc, ret) {
 const loginChallengeSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    tokenHash: { type: String, required: true },
+    tokenHash: { type: String, required: true, unique: true },
     expiresAt: { type: Date, required: true },
     consumedAt: { type: Date, default: undefined },
   },

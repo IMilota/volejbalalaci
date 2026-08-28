@@ -83,6 +83,28 @@ describe("Message", () => {
     );
   });
 
+  it("rejects Message.create when replyToId points at a reply", async () => {
+    const root = await Message.create({
+      eventId: null,
+      authorId: author._id,
+      body: "root",
+    });
+    const reply = await Message.createReply(root._id, {
+      authorId: author._id,
+      body: "reply",
+    });
+    await assert.rejects(
+      () =>
+        Message.create({
+          eventId: null,
+          authorId: author._id,
+          body: "nested",
+          replyToId: reply._id,
+        }),
+      { name: "ValidationError" }
+    );
+  });
+
   it("deletes replies when deleting a root, not when deleting a reply", async () => {
     const root = await Message.create({
       eventId: null,

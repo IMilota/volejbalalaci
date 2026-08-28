@@ -24,6 +24,28 @@ const messageSchema = new mongoose.Schema(
 
 messageSchema.index({ eventId: 1, createdAt: 1 });
 
+function eventKey(eventId) {
+  return eventId ? String(eventId) : null;
+}
+
+messageSchema.pre("validate", async function () {
+  if (!this.replyToId) {
+    return;
+  }
+  const parent = await this.constructor.findById(this.replyToId);
+  if (!parent) {
+    this.invalidate("replyToId", "parent message not found");
+    return;
+  }
+  if (parent.replyToId) {
+    this.invalidate("replyToId", "replyToId must point at a root message");
+    return;
+  }
+  if (eventKey(this.eventId) !== eventKey(parent.eventId)) {
+    this.invalidate("eventId", "reply eventId must match parent");
+  }
+});
+
 messageSchema.statics.createReply = async function (parentId, { authorId, body, eventId } = {}) {
   const parent = await this.findById(parentId);
   if (!parent) {
