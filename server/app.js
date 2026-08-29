@@ -10,6 +10,7 @@ const configRouter = require("./routes/config");
 const authRouter = require("./routes/auth");
 const usersRouter = require("./routes/users");
 const eventsRouter = require("./routes/events");
+const attendancesRouter = require("./routes/attendances");
 
 const app = express();
 const port = process.env.PORT || 3111;
@@ -29,6 +30,7 @@ app.get("/api/me", requireAuth, asyncHandler(async (req, res) => {
 }));
 app.use("/api/users", usersRouter);
 app.use("/api/events", eventsRouter);
+app.use("/api/events/:eventId/attendances", attendancesRouter);
 
 app.use((err, req, res, next) => {
   const mapped = mapMongoError(err);
