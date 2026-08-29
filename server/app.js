@@ -1,36 +1,32 @@
-//načtení modulu express
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
 const { connectDb } = require("./db/connect");
 const { seedAdmin } = require("./db/seed-admin");
+const { sendError } = require("./http/errors");
+const { mapMongoError } = require("./http/mongo-errors");
+const configRouter = require("./routes/config");
 
-// volejbalalaci
-const eventController = require("./controller/volejbalalaci/event");
-const userController = require("./controller/volejbalalaci/user");
-const attendanceController = require("./controller/volejbalalaci/attendance");
-const messageController = require("./controller/volejbalalaci/message");
-
-//inicializace nového Express.js serveru
 const app = express();
-//definování portu, na kterém má aplikace běžet na localhostu
 const port = process.env.PORT || 3111;
 
-// Parsování body
-app.use(express.json()); // podpora pro application/json
-app.use(express.urlencoded({ extended: true })); // podpora pro application/x-www-form-urlencoded
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 app.get("/", (req, res) => {
   res.send("Volejbalalaci");
 });
 
-// volejbalaci
-app.use("/api/volejbalalaci/event", eventController);
-app.use("/api/volejbalalaci/user", userController);
-app.use("/api/volejbalalaci/attendance", attendanceController);
-app.use("/api/volejbalalaci/message", messageController);
+app.use("/api/config", configRouter);
+
+app.use((err, req, res, next) => {
+  const mapped = mapMongoError(err);
+  if (mapped) {
+    return sendError(res, mapped.status, mapped.code, mapped.message);
+  }
+  console.error(err);
+  return sendError(res, 500, "internalError", err.message || "internal error");
+});
 
 async function start() {
   await connectDb();
@@ -46,3 +42,5 @@ if (require.main === module) {
     process.exit(1);
   });
 }
+
+module.exports = { app, start };
