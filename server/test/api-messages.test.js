@@ -70,6 +70,16 @@ describe("messages", () => {
     assert.ok(res.body[0].id);
   });
 
+  it("GET with invalid eventId returns 400 dtoInIsNotValid", async () => {
+    const { token } = await makeUser();
+    const res = await request(app)
+      .get("/api/messages")
+      .query({ eventId: "not-an-id" })
+      .set(bearer(token));
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, "dtoInIsNotValid");
+  });
+
   it("GET ?eventId= returns that event's messages sorted by createdAt", async () => {
     const { user, token } = await makeUser();
     const event = await makeEvent();

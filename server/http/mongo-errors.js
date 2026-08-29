@@ -3,6 +3,9 @@ function mapMongoError(err) {
   if (err.name === "ValidationError") {
     return { status: 400, code: "dtoInIsNotValid", message: err.message };
   }
+  if (err.name === "CastError" || err.name === "BSONError" || err.name === "BSONTypeError") {
+    return { status: 400, code: "dtoInIsNotValid", message: err.message };
+  }
   if (err.code === 11000) {
     const key = Object.keys(err.keyPattern || err.keyValue || {})[0];
     if (key === "email") {

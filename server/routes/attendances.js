@@ -5,6 +5,7 @@ const { asyncHandler } = require("../http/asyncHandler");
 const { requireAuth } = require("../middleware/auth");
 const Event = require("../models/event");
 const Attendance = require("../models/attendance");
+const User = require("../models/user");
 
 const router = express.Router({ mergeParams: true });
 
@@ -28,6 +29,12 @@ async function upsertAttendance(req, res, userId) {
   }
   if (!mongoose.isValidObjectId(userId)) {
     return sendError(res, 404, "userNotFound", "user not found");
+  }
+  if (String(userId) !== String(req.user._id)) {
+    const target = await User.exists({ _id: userId });
+    if (!target) {
+      return sendError(res, 404, "userNotFound", "user not found");
+    }
   }
 
   const { status, guests, note } = req.body || {};

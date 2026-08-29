@@ -126,6 +126,19 @@ describe("attendances", () => {
     assert.equal(await Attendance.countDocuments(), 0);
   });
 
+  it("admin PUT for a well-formed ObjectId that is not a user returns 404 userNotFound", async () => {
+    const { token } = await makeAdmin();
+    const event = await makeEvent();
+    const missingUserId = "000000000000000000000001";
+    const res = await request(app)
+      .put(path(event.id, missingUserId))
+      .set(bearer(token))
+      .send({ status: "yes" });
+    assert.equal(res.status, 404);
+    assert.equal(res.body.code, "userNotFound");
+    assert.equal(await Attendance.countDocuments(), 0);
+  });
+
   it("admin can PUT another user's attendance", async () => {
     const { token } = await makeAdmin();
     const { user } = await makeUser();

@@ -15,11 +15,21 @@ async function withOccupied(event) {
   return { ...event.toJSON(), occupied: await Attendance.occupiedSeats(event._id) };
 }
 
+function parseQueryDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    const err = new Error("invalid date");
+    err.name = "CastError";
+    throw err;
+  }
+  return date;
+}
+
 function startAtQuery(query) {
   if (query.from || query.to) {
     const startAt = {};
-    if (query.from) startAt.$gte = new Date(query.from);
-    if (query.to) startAt.$lte = new Date(query.to);
+    if (query.from) startAt.$gte = parseQueryDate(query.from);
+    if (query.to) startAt.$lte = parseQueryDate(query.to);
     return { startAt };
   }
   return { startAt: { $gte: new Date() } };

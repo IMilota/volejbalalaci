@@ -114,6 +114,16 @@ describe("events", () => {
     );
   });
 
+  it("GET with invalid from date returns 400 dtoInIsNotValid", async () => {
+    const { token } = await makeAdmin();
+    const res = await request(app)
+      .get("/api/events")
+      .query({ from: "not-a-date" })
+      .set(bearer(token));
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, "dtoInIsNotValid");
+  });
+
   it("GET /api/events?from&to filters by startAt range including past", async () => {
     const { token } = await makeAdmin();
     const past = await Event.create({
