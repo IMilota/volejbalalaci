@@ -183,11 +183,15 @@ Not stored in Mongo.
 
 Frontend later (same env pattern, exposed via public config): instance name, icon, color scheme.
 
+## Amendment (2026-08-29)
+
+From the REST spec: collection `pushSubscriptions` (`userId`, unique `endpoint`, `p256dh`, `auth`). Event field `reminderSentAt` (Date, omitted until the 24 h attendance reminder is sent). Web Push only (not email notifications). Details: `docs/superpowers/specs/2026-08-29-rest-endpoints-design.md`.
+
 ## Implementation order (after this spec)
 
 1. Install local MongoDB, wire Mongoose, models, indexes, admin seed.
-2. Rewrite backend endpoints against this model (auth, CRUD, capacity, rides flag).
-3. Frontend, including theme.
+2. Rewrite backend endpoints against this model (auth, CRUD, capacity, rides flag, Web Push).
+3. Frontend, including theme and PWA install.
 
 ## Decisions rejected
 
