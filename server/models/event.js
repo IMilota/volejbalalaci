@@ -25,6 +25,7 @@ const eventSchema = new mongoose.Schema(
     capacity: { type: Number, required: true, min: 1, validate: { validator: Number.isInteger, message: "capacity must be an integer" } },
     description: { type: String, default: undefined },
     status: { type: String, enum: ["scheduled", "cancelled"], default: "scheduled", required: true },
+    reminderSentAt: { type: Date, default: undefined },
   },
   {
     timestamps: true,

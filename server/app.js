@@ -8,6 +8,8 @@ const { mapMongoError } = require("./http/mongo-errors");
 const { requireAuth } = require("./middleware/auth");
 const configRouter = require("./routes/config");
 const authRouter = require("./routes/auth");
+const usersRouter = require("./routes/users");
+const eventsRouter = require("./routes/events");
 
 const app = express();
 const port = process.env.PORT || 3111;
@@ -25,6 +27,8 @@ app.use("/api/auth", authRouter);
 app.get("/api/me", requireAuth, asyncHandler(async (req, res) => {
   res.json(req.user.toJSON());
 }));
+app.use("/api/users", usersRouter);
+app.use("/api/events", eventsRouter);
 
 app.use((err, req, res, next) => {
   const mapped = mapMongoError(err);
