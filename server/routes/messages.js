@@ -4,10 +4,25 @@ const { sendError } = require("../http/errors");
 const { asyncHandler } = require("../http/asyncHandler");
 const { requireAuth } = require("../middleware/auth");
 const Message = require("../models/message");
+const PushSubscription = require("../models/push-subscription");
+const { sendPushToUserIds } = require("../services/push");
 
 const router = express.Router();
 
 router.use(requireAuth);
+
+async function notifyOthers(req, message) {
+  const userIds = await PushSubscription.distinct("userId", {
+    userId: { $ne: req.user._id },
+  });
+  await sendPushToUserIds(userIds, {
+    type: "message",
+    messageId: String(message._id),
+    eventId: message.eventId ? String(message.eventId) : null,
+    title: req.user.nickname,
+    body: message.body,
+  });
+}
 
 function canManageMessage(user, message) {
   return user.role === "admin" || String(user._id) === String(message.authorId);
@@ -38,6 +53,7 @@ router.post(
         body,
         eventId: eventId !== undefined ? eventId : undefined,
       });
+      await notifyOthers(req, reply);
       return res.json(reply.toJSON());
     }
     const message = await Message.create({
@@ -45,6 +61,7 @@ router.post(
       authorId: req.user._id,
       body,
     });
+    await notifyOthers(req, message);
     res.json(message.toJSON());
   })
 );

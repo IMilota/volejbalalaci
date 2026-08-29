@@ -13,6 +13,9 @@ const eventsRouter = require("./routes/events");
 const attendancesRouter = require("./routes/attendances");
 const messagesRouter = require("./routes/messages");
 const { eventRidesRouter, ridesRouter } = require("./routes/rides");
+const pushRouter = require("./routes/push");
+const cron = require("node-cron");
+const { runAttendanceReminders } = require("./services/reminders");
 
 const app = express();
 const port = process.env.PORT || 3111;
@@ -36,6 +39,7 @@ app.use("/api/events/:eventId/attendances", attendancesRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/events/:eventId/rides", eventRidesRouter);
 app.use("/api/rides", ridesRouter);
+app.use("/api/push", pushRouter);
 
 app.use((err, req, res, next) => {
   const mapped = mapMongoError(err);
@@ -51,6 +55,9 @@ async function start() {
   await seedAdmin();
   app.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`);
+  });
+  cron.schedule("*/15 * * * *", () => {
+    runAttendanceReminders().catch((err) => console.error(err));
   });
 }
 
