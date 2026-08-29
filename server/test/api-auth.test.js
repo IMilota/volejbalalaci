@@ -11,9 +11,11 @@ describe("auth", () => {
   let app;
   before(async () => {
     process.env.APP_BASE_URL = "http://localhost:3000";
-    delete process.env.SMTP_HOST;
-    delete process.env.SMTP_FROM;
     await connectTestDb();
+    // dotenv.config() in connect.js fills unset keys from .env; clear after connect
+    // so a populated .env cannot trigger real SMTP during tests.
+    process.env.SMTP_HOST = "";
+    process.env.SMTP_FROM = "";
     ({ app } = require("../app"));
   });
   after(disconnectTestDb);
