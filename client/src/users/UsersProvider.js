@@ -14,9 +14,22 @@ function labelFor(user, id) {
   return String(id || "").slice(0, 8);
 }
 
+async function fetchUsers() {
+  const data = await api("/api/users");
+  return Array.isArray(data) ? data : [];
+}
+
 export function UsersProvider({ children }) {
   const { status } = useAuth();
   const [users, setUsers] = useState([]);
+
+  const reload = useCallback(async () => {
+    try {
+      setUsers(await fetchUsers());
+    } catch {
+      setUsers([]);
+    }
+  }, []);
 
   useEffect(() => {
     if (status !== "ready") {
@@ -25,9 +38,9 @@ export function UsersProvider({ children }) {
     let cancelled = false;
     (async () => {
       try {
-        const data = await api("/api/users");
+        const data = await fetchUsers();
         if (!cancelled) {
-          setUsers(Array.isArray(data) ? data : []);
+          setUsers(data);
         }
       } catch {
         if (!cancelled) {
@@ -48,7 +61,7 @@ export function UsersProvider({ children }) {
     [users]
   );
 
-  const value = useMemo(() => ({ users, displayName }), [users, displayName]);
+  const value = useMemo(() => ({ users, displayName, reload }), [users, displayName, reload]);
 
   return <UsersContext.Provider value={value}>{children}</UsersContext.Provider>;
 }

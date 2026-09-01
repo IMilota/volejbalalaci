@@ -2,6 +2,7 @@ import { render, screen, waitFor, fireEvent, within } from "@testing-library/rea
 import { MemoryRouter } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { UsersProvider } from "../users/UsersProvider";
 import UsersPage from "./UsersPage";
 
 jest.mock("../api/client", () => ({
@@ -50,17 +51,21 @@ const memberUser = {
 function renderPage() {
   return render(
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <UsersPage />
+      <UsersProvider>
+        <UsersPage />
+      </UsersProvider>
     </MemoryRouter>
   );
 }
 
-test("non-admin sees permission copy and not the table", () => {
+test("non-admin sees permission copy and not the table", async () => {
   setRole("user");
+  api.mockResolvedValue([]);
   renderPage();
   expect(screen.getByText(/nemáš oprávnění/i)).toBeInTheDocument();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
-  expect(api).not.toHaveBeenCalled();
+  await waitFor(() => expect(api).toHaveBeenCalledWith("/api/users"));
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });
 
 test("admin sees member table", async () => {

@@ -9,6 +9,7 @@ import Table from "react-bootstrap/Table";
 import { ApiError, api } from "../api/client";
 import { errorCopy } from "../api/error-copy";
 import { useAuth } from "../auth/AuthProvider";
+import { useUsers } from "../users/UsersProvider";
 
 const EMPTY_FIELDS = {
   name: "",
@@ -150,6 +151,7 @@ function MemberForm({ show, member, lastAdminLocked, onHide, onSaved }) {
 
 export default function UsersPage() {
   const { user } = useAuth();
+  const { reload } = useUsers();
   const isAdmin = user?.role === "admin";
   const [loading, setLoading] = useState(isAdmin);
   const [error, setError] = useState(null);
@@ -255,6 +257,7 @@ export default function UsersPage() {
         }}
         onSaved={() => {
           load();
+          reload();
         }}
       />
     </Container>
