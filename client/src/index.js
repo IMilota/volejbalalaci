@@ -11,6 +11,7 @@ import HomePage from "./screens/HomePage";
 import EventListPage from "./screens/EventListPage";
 import EventDetailPage from "./screens/EventDetailPage";
 import BoardPage from "./screens/BoardPage";
+import UsersPage from "./screens/UsersPage";
 import App from "./App";
 
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -63,6 +64,7 @@ root.render(
               <Route path="/events" element={<EventListPage />} />
               <Route path="/events/:id" element={<EventDetailPage />} />
               <Route path="board" element={<BoardPage />} />
+              <Route path="/users" element={<UsersPage />} />
               <Route path="*" element={<HomePage />} />
             </Route>
           </Route>
