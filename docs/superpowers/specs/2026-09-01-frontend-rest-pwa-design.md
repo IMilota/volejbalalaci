@@ -92,7 +92,7 @@ Patch: same fields. Show 409 `emailAlreadyExists`, `nicknameAlreadyExists`, `las
 
 **Push:** hide both actions when `vapidPublicKey` is null. **Zapnout oznámení** when there is no PushSubscription for this origin. User gesture → `Notification.requestPermission` → `pushManager.subscribe` → `POST /api/push/subscribe` with the PushSubscription JSON. On 503 `pushNotConfigured`, hide the actions. **Vypnout oznámení** when a subscription exists → `DELETE /api/push/subscribe` `{ endpoint }` then `unsubscribe()`.
 
-**Service worker:** show notifications on push. Notification click:
+**Service worker:** auto-update (`skipWaiting`, `clientsClaim`, cleanup outdated caches). Register on `window` `load`, `scope: "/"`. Do not cache `/api/`. SPA navigations fall back to `index.html`. `npm start` serves `public/sw.js` (CRA no-ops `/service-worker.js` in dev). Production build uses CRA InjectManifest `src/service-worker.js`. Show notifications on push. Notification click:
 
 - `type === "message"` and `eventId` null → `/board`
 - `type === "message"` with `eventId` → `/events/:id`

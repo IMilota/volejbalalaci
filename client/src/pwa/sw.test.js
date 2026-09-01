@@ -7,18 +7,29 @@ function loadServiceWorker() {
   const listeners = {};
   const openWindow = jest.fn();
   const showNotification = jest.fn();
+  const skipWaiting = jest.fn().mockResolvedValue(undefined);
+  const claim = jest.fn().mockResolvedValue(undefined);
+  const cacheDelete = jest.fn().mockResolvedValue(true);
   const context = {
+    URL,
     self: {
+      skipWaiting,
+      clients: { claim },
       addEventListener(type, handler) {
         listeners[type] = handler;
       },
       registration: { showNotification },
     },
-    clients: { openWindow },
+    clients: { openWindow, claim },
+    caches: {
+      keys: jest.fn().mockResolvedValue(["old-cache", "volejbalalaci-runtime-v1"]),
+      delete: cacheDelete,
+      match: jest.fn(),
+    },
   };
   vm.createContext(context);
   vm.runInContext(code, context);
-  return { listeners, openWindow, showNotification };
+  return { listeners, openWindow, showNotification, skipWaiting, claim, cacheDelete };
 }
 
 function clickNotification(listeners, data) {
@@ -46,4 +57,28 @@ test("reminder with eventId opens /events/:id", () => {
   const { listeners, openWindow } = loadServiceWorker();
   clickNotification(listeners, { type: "reminder", eventId: "evt-2" });
   expect(openWindow).toHaveBeenCalledWith("/events/evt-2");
+});
+
+test("install skips waiting and activate claims clients", async () => {
+  const { listeners, skipWaiting, claim, cacheDelete } = loadServiceWorker();
+  const installWait = jest.fn();
+  listeners.install({ waitUntil: installWait });
+  await installWait.mock.calls[0][0];
+  expect(skipWaiting).toHaveBeenCalled();
+
+  const activateWait = jest.fn();
+  listeners.activate({ waitUntil: activateWait });
+  await activateWait.mock.calls[0][0];
+  expect(cacheDelete).toHaveBeenCalledWith("old-cache");
+  expect(claim).toHaveBeenCalled();
+});
+
+test("does not intercept /api fetches", () => {
+  const { listeners } = loadServiceWorker();
+  const respondWith = jest.fn();
+  listeners.fetch({
+    request: { url: "http://localhost/api/events", mode: "navigate" },
+    respondWith,
+  });
+  expect(respondWith).not.toHaveBeenCalled();
 });
