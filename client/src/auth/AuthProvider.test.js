@@ -81,3 +81,17 @@ test("logout posts /api/auth/logout and clears sessionToken", async () => {
     expect.objectContaining({ method: "POST" })
   );
 });
+
+test("network failure on GET /api/me does not clear sessionToken", async () => {
+  localStorage.setItem("sessionToken", "sess-1");
+  global.fetch = jest.fn().mockImplementation((url) => {
+    if (url === "/api/me") {
+      return Promise.reject(new Error("offline"));
+    }
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
+  renderAuth();
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith("/api/me", expect.anything()));
+  expect(localStorage.getItem("sessionToken")).toBe("sess-1");
+  expect(screen.queryByText("status:anon")).not.toBeInTheDocument();
+});

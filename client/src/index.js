@@ -13,8 +13,17 @@ import "./index.css";
 import "./theme.css";
 
 function RequireAuth() {
-  const { status } = useAuth();
+  const { status, error } = useAuth();
   if (status === "loading") {
+    if (error) {
+      return (
+        <div className="container py-4">
+          <div className="alert alert-danger" role="alert">
+            {error}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="d-flex justify-content-center py-5">
         <Spinner animation="border" />
@@ -38,6 +47,7 @@ root.render(
           <Route element={<RequireAuth />}>
             <Route element={<App />}>
               <Route path="/" element={<div>home</div>} />
+              <Route path="*" element={<div>home</div>} />
             </Route>
           </Route>
         </Routes>

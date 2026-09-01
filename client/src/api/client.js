@@ -52,7 +52,7 @@ export async function api(path, { method = "GET", body, token } = {}) {
       payload = {};
     }
     if (res.status === 401 && sessionToken && onUnauthorized) {
-      onUnauthorized();
+      onUnauthorized(sessionToken);
     }
     throw new ApiError({
       code: payload.code,

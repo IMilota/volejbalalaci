@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, setOnUnauthorized } from "../api/client";
+import { ApiError, api, setOnUnauthorized } from "../api/client";
+import { errorCopy } from "../api/error-copy";
 
 const AuthContext = createContext(null);
 
@@ -11,16 +12,22 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState(() =>
     localStorage.getItem("sessionToken") ? "loading" : "anon"
   );
+  const [error, setError] = useState(null);
+  const bootGenRef = useRef(0);
 
   const clearSession = useCallback(() => {
     localStorage.removeItem("sessionToken");
     setToken(null);
     setUser(null);
     setStatus("anon");
+    setError(null);
   }, []);
 
   useEffect(() => {
-    setOnUnauthorized(() => {
+    setOnUnauthorized((failedToken) => {
+      if (failedToken && localStorage.getItem("sessionToken") !== failedToken) {
+        return;
+      }
       clearSession();
       navigate("/login", { replace: true });
     });
@@ -33,19 +40,33 @@ export function AuthProvider({ children }) {
       setStatus("anon");
       return undefined;
     }
+    const bootGen = bootGenRef.current;
     let cancelled = false;
     (async () => {
       try {
-        const me = await api("/api/me");
-        if (!cancelled) {
-          setUser(me);
-          setToken(stored);
-          setStatus("ready");
+        const me = await api("/api/me", { token: stored });
+        if (cancelled || bootGen !== bootGenRef.current) {
+          return;
         }
-      } catch {
-        if (!cancelled) {
+        if (localStorage.getItem("sessionToken") !== stored) {
+          return;
+        }
+        setUser(me);
+        setToken(stored);
+        setStatus("ready");
+        setError(null);
+      } catch (err) {
+        if (cancelled || bootGen !== bootGenRef.current) {
+          return;
+        }
+        if (localStorage.getItem("sessionToken") !== stored) {
+          return;
+        }
+        if (err instanceof ApiError && err.status === 401) {
           clearSession();
+          return;
         }
+        setError(err instanceof ApiError ? err.message : errorCopy("network"));
       }
     })();
     return () => {
@@ -67,10 +88,12 @@ export function AuthProvider({ children }) {
       body: { token: challengeToken },
       token: null,
     });
+    bootGenRef.current += 1;
     localStorage.setItem("sessionToken", body.token);
     setToken(body.token);
     setUser(body.user);
     setStatus("ready");
+    setError(null);
     return body;
   }, []);
 
@@ -95,12 +118,13 @@ export function AuthProvider({ children }) {
       user,
       token,
       status,
+      error,
       requestChallenge,
       consumeToken,
       logout,
       logoutAll,
     }),
-    [user, token, status, requestChallenge, consumeToken, logout, logoutAll]
+    [user, token, status, error, requestChallenge, consumeToken, logout, logoutAll]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

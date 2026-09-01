@@ -55,7 +55,7 @@ test("api calls onUnauthorized then throws on 401 when a token was sent", async 
     json: async () => ({ code: "unauthorized", message: "invalid token" }),
   });
   await expect(api("/api/me")).rejects.toBeInstanceOf(ApiError);
-  expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  expect(onUnauthorized).toHaveBeenCalledWith("dead");
 });
 
 test("api omits Bearer when token is null even if sessionToken is stored", async () => {
