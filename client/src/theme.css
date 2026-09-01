@@ -1,0 +1,9 @@
+:root {
+  --vb-blue: #1e4fa3;
+  --vb-red: #d0121a;
+  --vb-bg: #ffffff;
+  --vb-text: #1a1a1a;
+}
+body { background: var(--vb-bg); color: var(--vb-text); }
+.navbar-vb { background: var(--vb-blue); }
+.btn-primary { background-color: var(--vb-blue); border-color: var(--vb-blue); }
