@@ -11,6 +11,7 @@ import { ApiError, api } from "../api/client";
 import { errorCopy } from "../api/error-copy";
 import { useAuth } from "../auth/AuthProvider";
 import EventForm from "../events/EventForm";
+import MessageThread from "../messages/MessageThread";
 import { useUsers } from "../users/UsersProvider";
 
 const STATUS_LABEL = {
@@ -300,6 +301,9 @@ export default function EventDetailPage() {
           </li>
         ))}
       </ul>
+
+      <h2 className="h5 mt-4">Zprávy</h2>
+      <MessageThread eventId={id} />
 
       <EventForm show={editOpen} onHide={() => setEditOpen(false)} event={event} onSaved={setEvent} />
     </Container>
