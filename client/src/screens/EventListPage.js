@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Alert from "react-bootstrap/Alert";
 import Badge from "react-bootstrap/Badge";
@@ -32,7 +32,7 @@ export default function EventListPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -43,11 +43,11 @@ export default function EventListPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   return (
     <Container className="pb-4">
@@ -92,7 +92,11 @@ export default function EventListPage() {
         ))
       )}
       <EventForm show={createOpen} onHide={() => setCreateOpen(false)} />
-      <BulkEventForm show={bulkOpen} onHide={() => setBulkOpen(false)} />
+      <BulkEventForm
+        show={bulkOpen}
+        onHide={() => setBulkOpen(false)}
+        onCreated={load}
+      />
     </Container>
   );
 }

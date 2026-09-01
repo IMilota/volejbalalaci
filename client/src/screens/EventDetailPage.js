@@ -115,7 +115,7 @@ export default function EventDetailPage() {
     setRsvpBusy(true);
     const body = {
       status,
-      guests: status === "yes" ? Number(guests) || 0 : 0,
+      guests: status === "yes" ? Math.min(6, Math.max(0, Number.parseInt(guests, 10) || 0)) : 0,
       note,
     };
     const path =

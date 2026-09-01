@@ -91,3 +91,65 @@ test("RSVP 409 does not replace local attendance with the failed payload", async
     })
   );
 });
+
+test("RSVP yes clamps guests to 0–6 before PUT", async () => {
+  api.mockImplementation((path, opts = {}) => {
+    if (path === "/api/users") {
+      return Promise.resolve([{ id: "u1", name: "Ivo" }]);
+    }
+    if (path === "/api/events/e1") {
+      return Promise.resolve({
+        id: "e1",
+        name: "Úterý",
+        startAt: "2030-01-01T17:00:00.000Z",
+        endAt: "2030-01-01T19:00:00.000Z",
+        location: "Hala",
+        capacity: 12,
+        occupied: 1,
+        status: "scheduled",
+      });
+    }
+    if (path === "/api/events/e1/attendances") {
+      return Promise.resolve([
+        { id: "a1", userId: "u1", status: "yes", guests: 0, note: "" },
+      ]);
+    }
+    if (path === "/api/events/e1/attendances/me" && opts.method === "PUT") {
+      return Promise.resolve({
+        id: "a1",
+        userId: "u1",
+        status: "yes",
+        guests: opts.body.guests,
+        note: "",
+      });
+    }
+    return Promise.resolve({});
+  });
+
+  render(
+    <MemoryRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      initialEntries={["/events/e1"]}
+    >
+      <UsersProvider>
+        <Routes>
+          <Route path="/events/:id" element={<EventDetailPage />} />
+        </Routes>
+      </UsersProvider>
+    </MemoryRouter>
+  );
+
+  await waitFor(() => expect(screen.getByLabelText("Hosté")).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText("Hosté"), { target: { value: "99" } });
+  fireEvent.click(screen.getByRole("button", { name: "Uložit" }));
+
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      "/api/events/e1/attendances/me",
+      expect.objectContaining({
+        method: "PUT",
+        body: expect.objectContaining({ status: "yes", guests: 6 }),
+      })
+    )
+  );
+});

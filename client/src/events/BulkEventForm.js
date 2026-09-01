@@ -19,7 +19,7 @@ function emptyOccurrence() {
   return { startAt: "", endAt: "" };
 }
 
-export default function BulkEventForm({ show, onHide }) {
+export default function BulkEventForm({ show, onHide, onCreated }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
@@ -87,6 +87,9 @@ export default function BulkEventForm({ show, onHide }) {
     try {
       await api("/api/events/bulk", { method: "POST", body: payload });
       onHide();
+      if (onCreated) {
+        await onCreated();
+      }
       navigate("/events");
     } catch (err) {
       setError(formError(err));
@@ -97,7 +100,7 @@ export default function BulkEventForm({ show, onHide }) {
 
   return (
     <Modal show={show} onHide={busy ? undefined : onHide} size="lg">
-      <Form onSubmit={handleSubmit}>
+      <Form onSubmit={handleSubmit} noValidate>
         <Modal.Header closeButton={!busy}>
           <Modal.Title>Nové události</Modal.Title>
         </Modal.Header>
