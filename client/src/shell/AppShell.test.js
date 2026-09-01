@@ -2,6 +2,7 @@ import { render, screen, waitFor, fireEvent, act } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { useConfig } from "../config/ConfigProvider";
+import { clearStashedInstallPrompt } from "../pwa/installPromptCapture";
 import AppShell from "./AppShell";
 
 jest.mock("../auth/AuthProvider", () => ({
@@ -25,6 +26,10 @@ function mockPushEnvironment({ subscription = null } = {}) {
   });
   return { getSubscription, subscribe };
 }
+
+afterEach(() => {
+  clearStashedInstallPrompt();
+});
 
 function renderShell(role, config = { instanceName: "Volejbalaláci", vapidPublicKey: null }) {
   useAuth.mockReturnValue({
@@ -65,6 +70,20 @@ test("with vapidPublicKey and no subscription, Zapnout oznámení is present", a
 test("Nainstalovat is absent until beforeinstallprompt", () => {
   renderShell("user");
   expect(screen.queryByRole("button", { name: /nainstalovat/i })).not.toBeInTheDocument();
+});
+
+test("Nainstalovat appears when beforeinstallprompt fired before render", () => {
+  window.matchMedia = jest.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query,
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+  }));
+  const event = new Event("beforeinstallprompt");
+  event.prompt = jest.fn().mockResolvedValue(undefined);
+  window.dispatchEvent(event);
+  renderShell("user");
+  expect(screen.getByRole("button", { name: /nainstalovat/i })).toBeInTheDocument();
 });
 
 test("Nainstalovat appears after beforeinstallprompt when not standalone", async () => {

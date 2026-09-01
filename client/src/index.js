@@ -17,6 +17,7 @@ import App from "./App";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./index.css";
 import "./theme.css";
+import "./pwa/installPromptCapture";
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js");

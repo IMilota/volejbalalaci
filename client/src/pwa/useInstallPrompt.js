@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import {
+  clearStashedInstallPrompt,
+  getStashedInstallPrompt,
+  subscribeInstallPrompt,
+} from "./installPromptCapture";
 
 function isStandalone() {
   return (
@@ -8,23 +13,16 @@ function isStandalone() {
 }
 
 export function useInstallPrompt() {
-  const [deferred, setDeferred] = useState(null);
+  const [deferred, setDeferred] = useState(getStashedInstallPrompt);
 
-  useEffect(() => {
-    function onBeforeInstallPrompt(event) {
-      event.preventDefault();
-      setDeferred(event);
-    }
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-  }, []);
+  useEffect(() => subscribeInstallPrompt(setDeferred), []);
 
   const install = useCallback(async () => {
     if (!deferred) {
       return;
     }
     await deferred.prompt();
-    setDeferred(null);
+    clearStashedInstallPrompt();
   }, [deferred]);
 
   return {
