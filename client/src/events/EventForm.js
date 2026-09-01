@@ -100,8 +100,9 @@ export default function EventForm({ show, onHide, event, onSaved }) {
       location: fields.location.trim(),
       capacity,
     };
-    if (fields.description.trim()) {
-      payload.description = fields.description.trim();
+    const description = fields.description.trim();
+    if (editing || description) {
+      payload.description = description;
     }
     setBusy(true);
     try {
