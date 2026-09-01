@@ -5,7 +5,11 @@ import Spinner from "react-bootstrap/Spinner";
 
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { ConfigProvider } from "./config/ConfigProvider";
+import { UsersProvider } from "./users/UsersProvider";
 import LoginPage from "./screens/LoginPage";
+import HomePage from "./screens/HomePage";
+import EventListPage from "./screens/EventListPage";
+import EventDetailPage from "./screens/EventDetailPage";
 import App from "./App";
 
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -36,6 +40,14 @@ function RequireAuth() {
   return <Outlet />;
 }
 
+function AuthedApp() {
+  return (
+    <UsersProvider>
+      <App />
+    </UsersProvider>
+  );
+}
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
@@ -45,9 +57,11 @@ root.render(
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route element={<RequireAuth />}>
-            <Route element={<App />}>
-              <Route path="/" element={<div>home</div>} />
-              <Route path="*" element={<div>home</div>} />
+            <Route element={<AuthedApp />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/events" element={<EventListPage />} />
+              <Route path="/events/:id" element={<EventDetailPage />} />
+              <Route path="*" element={<HomePage />} />
             </Route>
           </Route>
         </Routes>

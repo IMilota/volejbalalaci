@@ -7,3 +7,15 @@
 body { background: var(--vb-bg); color: var(--vb-text); }
 .navbar-vb { background: var(--vb-blue); }
 .btn-primary { background-color: var(--vb-blue); border-color: var(--vb-blue); }
+.btn-rsvp-no {
+  color: var(--vb-red);
+  border-color: var(--vb-red);
+  background: transparent;
+}
+.btn-rsvp-no:hover,
+.btn-rsvp-no:focus,
+.btn-rsvp-no[aria-pressed="true"] {
+  color: #fff;
+  background: var(--vb-red);
+  border-color: var(--vb-red);
+}
