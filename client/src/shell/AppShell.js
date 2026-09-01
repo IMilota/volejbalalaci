@@ -4,13 +4,17 @@ import Container from "react-bootstrap/Container";
 import Nav from "react-bootstrap/Nav";
 import Navbar from "react-bootstrap/Navbar";
 import Icon from "@mdi/react";
-import { mdiLogout, mdiLogoutVariant, mdiVolleyball } from "@mdi/js";
+import { mdiBell, mdiBellOff, mdiDownload, mdiLogout, mdiLogoutVariant, mdiVolleyball } from "@mdi/js";
 import { useAuth } from "../auth/AuthProvider";
 import { useConfig } from "../config/ConfigProvider";
+import { useInstallPrompt } from "../pwa/useInstallPrompt";
+import { usePushSubscription } from "../pwa/usePushSubscription";
 
 export default function AppShell() {
   const { user, logout, logoutAll } = useAuth();
   const { config } = useConfig();
+  const { canInstall, install } = useInstallPrompt();
+  const { canEnable, canDisable, enable, disable } = usePushSubscription();
   const brand = config.instanceName || "Volejbalaláci";
 
   return (
@@ -40,6 +44,24 @@ export default function AppShell() {
               <Navbar.Text className="text-white">
                 {user?.name || user?.nickname}
               </Navbar.Text>
+              {canInstall ? (
+                <Button size="sm" variant="outline-light" onClick={() => install()}>
+                  <Icon path={mdiDownload} size={0.8} className="me-1" />
+                  Nainstalovat
+                </Button>
+              ) : null}
+              {canEnable ? (
+                <Button size="sm" variant="outline-light" onClick={() => enable()}>
+                  <Icon path={mdiBell} size={0.8} className="me-1" />
+                  Zapnout oznámení
+                </Button>
+              ) : null}
+              {canDisable ? (
+                <Button size="sm" variant="outline-light" onClick={() => disable()}>
+                  <Icon path={mdiBellOff} size={0.8} className="me-1" />
+                  Vypnout oznámení
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 variant="outline-light"

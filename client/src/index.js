@@ -18,6 +18,10 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./index.css";
 import "./theme.css";
 
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js");
+}
+
 function RequireAuth() {
   const { status, error } = useAuth();
   if (status === "loading") {
