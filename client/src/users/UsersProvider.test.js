@@ -103,7 +103,7 @@ test("creating a member updates users cache without remounting the provider", as
   fireEvent.click(within(dialog).getByRole("button", { name: "Vytvořit" }));
 
   await waitFor(() => expect(screen.getByTestId("user-names")).toHaveTextContent("Ivo|Nový"));
-  expect(screen.getByTestId("label-u3")).toHaveTextContent("Nový");
+  expect(screen.getByTestId("label-u3")).toHaveTextContent("novy");
 });
 
 test("editing a member updates displayName without remounting the provider", async () => {
@@ -122,7 +122,7 @@ test("editing a member updates displayName without remounting the provider", asy
   });
 
   renderWithCache();
-  await waitFor(() => expect(screen.getByTestId("label-u2")).toHaveTextContent("Alena"));
+  await waitFor(() => expect(screen.getByTestId("label-u2")).toHaveTextContent("alena"));
 
   const row = screen.getByText("alena@x.cz").closest("tr");
   fireEvent.click(within(row).getByRole("button", { name: /upravit/i }));
@@ -130,6 +130,6 @@ test("editing a member updates displayName without remounting the provider", asy
   fireEvent.change(within(dialog).getByLabelText("Jméno"), { target: { value: "Alena Nová" } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Uložit" }));
 
-  await waitFor(() => expect(screen.getByTestId("label-u2")).toHaveTextContent("Alena Nová"));
+  await waitFor(() => expect(screen.getByTestId("label-u2")).toHaveTextContent("alena"));
   expect(screen.getByTestId("user-names")).toHaveTextContent("Ivo|Alena Nová");
 });

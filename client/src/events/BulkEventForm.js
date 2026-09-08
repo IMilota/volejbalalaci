@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Alert from "react-bootstrap/Alert";
 import Button from "react-bootstrap/Button";
@@ -7,6 +7,25 @@ import Modal from "react-bootstrap/Modal";
 import Spinner from "react-bootstrap/Spinner";
 import { ApiError, api } from "../api/client";
 import { errorCopy } from "../api/error-copy";
+import { applySkipped, expandRecurrence } from "./expandRecurrence";
+
+const WEEKDAYS = [
+  { value: "1", label: "Pondělí" },
+  { value: "2", label: "Úterý" },
+  { value: "3", label: "Středa" },
+  { value: "4", label: "Čtvrtek" },
+  { value: "5", label: "Pátek" },
+  { value: "6", label: "Sobota" },
+  { value: "7", label: "Neděle" },
+];
+
+const EXPAND_ERROR = {
+  incomplete: "Vyplň den, časy a období.",
+  range: "Datum od musí být před datem do.",
+  times: "Konec musí být po začátku.",
+  empty: "V tomto období žádný takový den není.",
+  tooMany: "Najednou jde vytvořit nejvýš 40 termínů.",
+};
 
 function formError(err) {
   if (err instanceof ApiError) {
@@ -15,8 +34,35 @@ function formError(err) {
   return errorCopy("network");
 }
 
-function emptyOccurrence() {
-  return { startAt: "", endAt: "" };
+function terminyLabel(count) {
+  if (count === 1) {
+    return "1 termín";
+  }
+  if (count >= 2 && count <= 4) {
+    return `${count} termíny`;
+  }
+  return `${count} termínů`;
+}
+
+function vynechaneLabel(count) {
+  if (count === 1) {
+    return "1 vynechaný";
+  }
+  if (count >= 2 && count <= 4) {
+    return `${count} vynechané`;
+  }
+  return `${count} vynechaných`;
+}
+
+function formatPreviewDate(ymd) {
+  const [year, month, day] = ymd.split("-").map(Number);
+  return new Intl.DateTimeFormat("cs-CZ", {
+    weekday: "short",
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 export default function BulkEventForm({ show, onHide, onCreated }) {
@@ -25,9 +71,14 @@ export default function BulkEventForm({ show, onHide, onCreated }) {
   const [location, setLocation] = useState("");
   const [capacity, setCapacity] = useState("12");
   const [description, setDescription] = useState("");
-  const [occurrences, setOccurrences] = useState([emptyOccurrence()]);
+  const [weekday, setWeekday] = useState("3");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [startTime, setStartTime] = useState("17:00");
+  const [endTime, setEndTime] = useState("19:00");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [skipped, setSkipped] = useState([]);
 
   useEffect(() => {
     if (!show) {
@@ -37,16 +88,31 @@ export default function BulkEventForm({ show, onHide, onCreated }) {
     setLocation("");
     setCapacity("12");
     setDescription("");
-    setOccurrences([emptyOccurrence()]);
+    setWeekday("3");
+    setFrom("");
+    setTo("");
+    setStartTime("17:00");
+    setEndTime("19:00");
     setError(null);
     setBusy(false);
+    setSkipped([]);
   }, [show]);
 
-  function updateOccurrence(index, key, value) {
-    setOccurrences((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
-    );
-  }
+  const plan = useMemo(
+    () =>
+      expandRecurrence({
+        weekday,
+        from,
+        to,
+        startTime,
+        endTime,
+      }),
+    [weekday, from, to, startTime, endTime]
+  );
+  const kept = useMemo(
+    () => applySkipped(plan.occurrences, skipped),
+    [plan.occurrences, skipped]
+  );
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -56,29 +122,19 @@ export default function BulkEventForm({ show, onHide, onCreated }) {
       setError("Kapacita musí být aspoň 1.");
       return;
     }
-    if (occurrences.length < 1) {
-      setError("Přidej aspoň jeden termín.");
+    if (plan.error) {
+      setError(EXPAND_ERROR[plan.error] || EXPAND_ERROR.incomplete);
       return;
     }
-    const mapped = [];
-    for (const row of occurrences) {
-      if (!row.startAt || !row.endAt) {
-        setError("Každý termín potřebuje začátek i konec.");
-        return;
-      }
-      const startAt = new Date(row.startAt).toISOString();
-      const endAt = new Date(row.endAt).toISOString();
-      if (new Date(endAt) <= new Date(startAt)) {
-        setError("Konec musí být po začátku.");
-        return;
-      }
-      mapped.push({ startAt, endAt });
+    if (kept.length < 1) {
+      setError("Vyber aspoň jeden termín.");
+      return;
     }
     const payload = {
       name: name.trim(),
       location: location.trim(),
       capacity: cap,
-      occurrences: mapped,
+      occurrences: kept.map(({ startAt, endAt }) => ({ startAt, endAt })),
     };
     if (description.trim()) {
       payload.description = description.trim();
@@ -98,11 +154,23 @@ export default function BulkEventForm({ show, onHide, onCreated }) {
     }
   }
 
+  const previewReady = !plan.error && plan.occurrences.length > 0;
+  const skippedCount = plan.occurrences.length - kept.length;
+
+  function toggleSkip(date) {
+    setSkipped((prev) => (prev.includes(date) ? prev.filter((item) => item !== date) : [...prev, date]));
+  }
+
   return (
-    <Modal show={show} onHide={busy ? undefined : onHide} size="lg">
+    <Modal
+      show={show}
+      onHide={busy ? undefined : onHide}
+      scrollable
+      dialogClassName="modal-vb-fit"
+    >
       <Form onSubmit={handleSubmit} noValidate>
         <Modal.Header closeButton={!busy}>
-          <Modal.Title>Nové události</Modal.Title>
+          <Modal.Title>Opakované termíny</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {error ? <Alert variant="danger">{error}</Alert> : null}
@@ -141,53 +209,94 @@ export default function BulkEventForm({ show, onHide, onCreated }) {
               disabled={busy}
             />
           </Form.Group>
-          <div className="d-flex justify-content-between align-items-center mb-2">
-            <strong>Termíny</strong>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline-primary"
-              disabled={busy}
-              onClick={() => setOccurrences((prev) => [...prev, emptyOccurrence()])}
-            >
-              Přidat termín
-            </Button>
+          <Form.Group className="mb-3" controlId="bulk-weekday">
+            <Form.Label>Den</Form.Label>
+            <Form.Select value={weekday} onChange={(e) => setWeekday(e.target.value)} disabled={busy}>
+              {WEEKDAYS.map((day) => (
+                <option key={day.value} value={day.value}>
+                  {day.label}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+          <div className="bulk-pair mb-3">
+            <Form.Group controlId="bulk-start-time">
+              <Form.Label>Začátek</Form.Label>
+              <Form.Control
+                type="time"
+                required
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                disabled={busy}
+              />
+            </Form.Group>
+            <Form.Group controlId="bulk-end-time">
+              <Form.Label>Konec</Form.Label>
+              <Form.Control
+                type="time"
+                required
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                disabled={busy}
+              />
+            </Form.Group>
           </div>
-          {occurrences.map((row, index) => (
-            <div key={index} className="border rounded p-3 mb-2">
-              <Form.Group className="mb-2" controlId={`bulk-start-${index}`}>
-                <Form.Label>Začátek</Form.Label>
-                <Form.Control
-                  type="datetime-local"
-                  required
-                  value={row.startAt}
-                  onChange={(e) => updateOccurrence(index, "startAt", e.target.value)}
-                  disabled={busy}
-                />
-              </Form.Group>
-              <Form.Group className="mb-2" controlId={`bulk-end-${index}`}>
-                <Form.Label>Konec</Form.Label>
-                <Form.Control
-                  type="datetime-local"
-                  required
-                  value={row.endAt}
-                  onChange={(e) => updateOccurrence(index, "endAt", e.target.value)}
-                  disabled={busy}
-                />
-              </Form.Group>
-              {occurrences.length > 1 ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline-danger"
-                  disabled={busy}
-                  onClick={() => setOccurrences((prev) => prev.filter((_, i) => i !== index))}
-                >
-                  Odebrat
-                </Button>
-              ) : null}
+          <div className="bulk-pair mb-3">
+            <Form.Group controlId="bulk-from">
+              <Form.Label>Od</Form.Label>
+              <Form.Control
+                type="date"
+                required
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                disabled={busy}
+              />
+            </Form.Group>
+            <Form.Group controlId="bulk-to">
+              <Form.Label>Do</Form.Label>
+              <Form.Control
+                type="date"
+                required
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                disabled={busy}
+              />
+            </Form.Group>
+          </div>
+          {previewReady ? (
+            <div className="bulk-preview">
+              <strong>
+                {terminyLabel(kept.length)}
+                {skippedCount > 0 ? ` · ${vynechaneLabel(skippedCount)}` : ""}
+              </strong>
+              <ul className="bulk-preview-list">
+                {plan.occurrences.map((row) => {
+                  const omitted = skipped.includes(row.date);
+                  const label = formatPreviewDate(row.date);
+                  return (
+                    <li
+                      key={row.date}
+                      className={omitted ? "bulk-preview-item is-skipped" : "bulk-preview-item"}
+                    >
+                      <span className="bulk-preview-date">{label}</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={omitted ? "outline-primary" : "outline-danger"}
+                        disabled={busy}
+                        aria-label={omitted ? `Vrátit ${label}` : `Odebrat ${label}`}
+                        onClick={() => toggleSkip(row.date)}
+                      >
+                        {omitted ? "Vrátit" : "Odebrat"}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-          ))}
+          ) : from && to ? (
+            <p className="text-muted mb-0">{EXPAND_ERROR[plan.error] || EXPAND_ERROR.incomplete}</p>
+          ) : null}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={onHide} disabled={busy}>

@@ -3,31 +3,36 @@ import { useParams } from "react-router-dom";
 import Alert from "react-bootstrap/Alert";
 import Badge from "react-bootstrap/Badge";
 import Button from "react-bootstrap/Button";
-import ButtonGroup from "react-bootstrap/ButtonGroup";
 import Container from "react-bootstrap/Container";
-import Form from "react-bootstrap/Form";
+import Modal from "react-bootstrap/Modal";
 import Spinner from "react-bootstrap/Spinner";
+import Icon from "@mdi/react";
+import { mdiClose, mdiMinus, mdiOpenInNew, mdiPencil, mdiPlus } from "@mdi/js";
 import { ApiError, api } from "../api/client";
 import { errorCopy } from "../api/error-copy";
 import { useAuth } from "../auth/AuthProvider";
+import AttendanceIcons from "../events/AttendanceIcons";
 import EventForm from "../events/EventForm";
+import { attendanceLevel } from "../events/attendanceLevel";
+import { attendeeCaption, effectiveAttendanceStatus, listMembers } from "../events/attendeeList";
 import MessageThread from "../messages/MessageThread";
 import { useUsers } from "../users/UsersProvider";
 
-const STATUS_LABEL = {
-  yes: "Ano",
-  no: "Ne",
-  maybe: "Možná",
-};
+function clampGuests(value) {
+  return Math.min(6, Math.max(0, Number.parseInt(value, 10) || 0));
+}
 
 function formatRange(startAt, endAt) {
   const start = new Date(startAt);
   const end = new Date(endAt);
   const dateFmt = new Intl.DateTimeFormat("cs-CZ", {
-    dateStyle: "short",
-    timeStyle: "short",
+    weekday: "short",
+    day: "numeric",
+    month: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
-  const timeFmt = new Intl.DateTimeFormat("cs-CZ", { timeStyle: "short" });
+  const timeFmt = new Intl.DateTimeFormat("cs-CZ", { hour: "2-digit", minute: "2-digit" });
   return `${dateFmt.format(start)} – ${timeFmt.format(end)}`;
 }
 
@@ -50,15 +55,11 @@ export default function EventDetailPage() {
   const [attendances, setAttendances] = useState([]);
   const [rsvpError, setRsvpError] = useState(null);
   const [rsvpBusy, setRsvpBusy] = useState(false);
-  const [note, setNote] = useState("");
   const [guests, setGuests] = useState(0);
-  const [targetUserId, setTargetUserId] = useState(user?.id);
   const [editOpen, setEditOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
-
-  useEffect(() => {
-    setTargetUserId(user?.id);
-  }, [user?.id, id]);
+  const [othersOpen, setOthersOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,35 +95,42 @@ export default function EventDetailPage() {
     };
   }, [id]);
 
-  const editingAttendance = useMemo(
-    () => attendances.find((row) => row.userId === targetUserId),
-    [attendances, targetUserId]
+  const myAttendance = useMemo(
+    () => attendances.find((row) => row.userId === user?.id),
+    [attendances, user?.id]
+  );
+  const members = useMemo(
+    () => listMembers({ users, attendances, myUserId: user?.id, displayName }),
+    [users, attendances, user?.id, displayName]
   );
 
   useEffect(() => {
-    setNote(editingAttendance?.note || "");
-    setGuests(editingAttendance?.guests || 0);
-  }, [editingAttendance]);
+    setGuests(myAttendance?.guests || 0);
+  }, [myAttendance]);
 
-  const currentStatus = editingAttendance?.status;
+  const currentStatus = effectiveAttendanceStatus(myAttendance?.status);
   const cancelledEvent = event?.status === "cancelled";
   const rsvpDisabled = cancelledEvent || rsvpBusy || !event;
 
-  async function submitRsvp(status) {
+  async function submitRsvp(userId, status, nextGuests) {
     if (rsvpDisabled) {
+      return;
+    }
+    const isMe = userId === user.id;
+    const existing = attendances.find((row) => row.userId === userId);
+    const current = effectiveAttendanceStatus(existing?.status);
+    const guestsChanged = isMe && status === "yes" && nextGuests !== undefined;
+    if (status === current && !guestsChanged) {
       return;
     }
     setRsvpError(null);
     setRsvpBusy(true);
-    const body = {
-      status,
-      guests: status === "yes" ? Math.min(6, Math.max(0, Number.parseInt(guests, 10) || 0)) : 0,
-      note,
-    };
-    const path =
-      targetUserId && targetUserId !== user.id
-        ? `/api/events/${id}/attendances/${targetUserId}`
-        : `/api/events/${id}/attendances/me`;
+    const body = isMe
+      ? { status, guests: status === "yes" ? clampGuests(nextGuests ?? guests) : 0 }
+      : { status };
+    const path = isMe
+      ? `/api/events/${id}/attendances/me`
+      : `/api/events/${id}/attendances/${userId}`;
     try {
       const saved = await api(path, { method: "PUT", body });
       setAttendances((prev) => {
@@ -138,15 +146,13 @@ export default function EventDetailPage() {
     }
   }
 
-  async function handleCancel() {
-    if (!window.confirm("Zrušit tento termín?")) {
-      return;
-    }
+  async function confirmCancel() {
     setCancelBusy(true);
     setRsvpError(null);
     try {
       const saved = await api(`/api/events/${id}/cancel`, { method: "POST" });
       setEvent(saved);
+      setCancelOpen(false);
     } catch (err) {
       setRsvpError(loadMessage(err));
     } finally {
@@ -174,138 +180,202 @@ export default function EventDetailPage() {
     return null;
   }
 
-  const showGuests = currentStatus === "yes";
-
   return (
-    <Container className="pb-4">
-      <div className="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
-        <div>
-          <h1 className="h3 mb-1">
-            {event.name}{" "}
-            {cancelledEvent ? (
-              <Badge bg="danger" className="align-middle">
-                Zrušeno
-              </Badge>
-            ) : null}
+    <Container className="event-detail">
+      <div className="event-detail-top">
+        <header className="event-header">
+        <div className="event-header-top">
+          <h1 className="event-header-title">
+            {event.name}
+            {cancelledEvent ? <Badge bg="danger">Zrušeno</Badge> : null}
           </h1>
-          <p className="mb-1">{formatRange(event.startAt, event.endAt)}</p>
-          <p className="mb-1">{event.location}</p>
-          <p className="mb-0">
-            {event.occupied} / {event.capacity}
-          </p>
-          {event.description ? <p className="mt-2 mb-0">{event.description}</p> : null}
+          {isAdmin ? (
+            <div className="event-header-tools">
+              <Button
+                variant="outline-primary"
+                size="sm"
+                aria-label="Upravit"
+                title="Upravit"
+                onClick={() => setEditOpen(true)}
+                disabled={cancelBusy}
+              >
+                <Icon path={mdiPencil} size={0.85} />
+              </Button>
+              <Button
+                variant="outline-danger"
+                size="sm"
+                aria-label="Zrušit"
+                title="Zrušit"
+                onClick={() => setCancelOpen(true)}
+                disabled={cancelBusy || cancelledEvent}
+              >
+                {cancelBusy ? (
+                  <Spinner animation="border" size="sm" />
+                ) : (
+                  <Icon path={mdiClose} size={0.85} />
+                )}
+              </Button>
+            </div>
+          ) : null}
         </div>
-        {isAdmin ? (
-          <div className="d-flex gap-2">
-            <Button variant="outline-primary" onClick={() => setEditOpen(true)} disabled={cancelBusy}>
-              Upravit
-            </Button>
-            <Button variant="danger" onClick={handleCancel} disabled={cancelBusy || cancelledEvent}>
-              {cancelBusy ? <Spinner animation="border" size="sm" className="me-2" /> : null}
-              Zrušit
-            </Button>
+        <dl className="event-header-meta">
+          <div>
+            <dt>Kdy</dt>
+            <dd>{formatRange(event.startAt, event.endAt)}</dd>
           </div>
-        ) : null}
-      </div>
+          <div>
+            <dt>Kde</dt>
+            <dd>{event.location}</dd>
+          </div>
+        </dl>
+        {event.description ? <p className="event-header-desc">{event.description}</p> : null}
+      </header>
 
       {rsvpError ? <Alert variant="danger">{rsvpError}</Alert> : null}
 
-      <h2 className="h5">Moje účast</h2>
-      {isAdmin ? (
-        <Form.Group className="mb-3" controlId="rsvp-user">
-          <Form.Label>Za člena</Form.Label>
-          <Form.Select
-            value={targetUserId || user.id}
-            disabled={rsvpDisabled}
-            onChange={(e) => setTargetUserId(e.target.value)}
-          >
-            {users.map((item) => (
-              <option key={item.id} value={item.id}>
-                {displayName(item.id)}
-                {item.id === user.id ? " (já)" : ""}
-              </option>
-            ))}
-          </Form.Select>
-        </Form.Group>
-      ) : null}
-      <ButtonGroup className="mb-3">
-        <Button
-          variant="primary"
-          disabled={rsvpDisabled}
-          aria-pressed={currentStatus === "yes"}
-          onClick={() => submitRsvp("yes")}
+      <div className="event-attendees-head">
+        <h2 className="h5 event-attendees-title">Účastníci</h2>
+        <button
+          type="button"
+          className={`event-attendance event-attendance--${attendanceLevel(event.occupied)}`}
+          aria-label={`Otevřít účastníky, ${event.occupied} / ${event.capacity}`}
+          title="Do 5 je málo, 6–8 se dá hrát, 9 a víc je super"
+          onClick={() => setOthersOpen(true)}
         >
-          {rsvpBusy ? <Spinner animation="border" size="sm" className="me-2" /> : null}
-          Ano
-        </Button>
-        <Button
-          variant="outline-danger"
-          className="btn-rsvp-no"
-          disabled={rsvpDisabled}
-          aria-pressed={currentStatus === "no"}
-          onClick={() => submitRsvp("no")}
-        >
-          Ne
-        </Button>
-        <Button
-          variant="light"
-          disabled={rsvpDisabled}
-          aria-pressed={currentStatus === "maybe"}
-          onClick={() => submitRsvp("maybe")}
-        >
-          Možná
-        </Button>
-      </ButtonGroup>
-      {showGuests ? (
-        <Form.Group className="mb-3" controlId="rsvp-guests" style={{ maxWidth: 160 }}>
-          <Form.Label>Hosté</Form.Label>
-          <Form.Control
-            type="number"
-            min={0}
-            max={6}
-            value={guests}
-            disabled={rsvpDisabled}
-            onChange={(e) => setGuests(e.target.value)}
-          />
-        </Form.Group>
-      ) : null}
-      <Form.Group className="mb-3" controlId="rsvp-note">
-        <Form.Label>Poznámka</Form.Label>
-        <Form.Control
-          as="textarea"
-          rows={2}
-          maxLength={280}
-          value={note}
-          disabled={rsvpDisabled}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </Form.Group>
-      {currentStatus ? (
-        <Button
-          className="mb-4"
-          variant="outline-primary"
-          disabled={rsvpDisabled}
-          onClick={() => submitRsvp(currentStatus)}
-        >
-          Uložit
-        </Button>
-      ) : null}
-
-      <h2 className="h5">Účastníci</h2>
-      <ul className="list-unstyled">
-        {attendances.map((row) => (
-          <li key={row.id || row.userId} className="border-bottom py-2">
-            <strong>{displayName(row.userId)}</strong> {STATUS_LABEL[row.status] || row.status}
-            {row.status === "yes" && row.guests > 0 ? ` · hosté ${row.guests}` : ""}
-            {row.note ? ` · ${row.note}` : ""}
-          </li>
-        ))}
+          {event.occupied} / {event.capacity}
+          <Icon path={mdiOpenInNew} size={0.7} />
+        </button>
+      </div>
+      <ul className="event-attendees list-unstyled">
+        <li className="event-attendee event-attendee--me">
+          <div className="event-attendee-main">
+            <strong className="event-attendee-name">{displayName(user.id)}</strong>
+            <AttendanceIcons
+              status={currentStatus}
+              disabled={rsvpDisabled}
+              onSelect={(status) => submitRsvp(user.id, status)}
+            />
+          </div>
+          {currentStatus === "yes" ? (
+            <div className="event-guests" role="group" aria-labelledby="rsvp-guests-label">
+              <span className="event-guests-label" id="rsvp-guests-label">
+                Hosté
+              </span>
+              <button
+                type="button"
+                className="event-rsvp-btn"
+                aria-label="Méně hostů"
+                disabled={rsvpDisabled || guests <= 0}
+                onClick={() => {
+                  const nextGuests = clampGuests(guests - 1);
+                  setGuests(nextGuests);
+                  submitRsvp(user.id, "yes", nextGuests);
+                }}
+              >
+                <Icon path={mdiMinus} size={0.9} />
+              </button>
+              <span className="event-guests-count">{guests}</span>
+              <button
+                type="button"
+                className="event-rsvp-btn"
+                aria-label="Více hostů"
+                disabled={rsvpDisabled || guests >= 6}
+                onClick={() => {
+                  const nextGuests = clampGuests(guests + 1);
+                  setGuests(nextGuests);
+                  submitRsvp(user.id, "yes", nextGuests);
+                }}
+              >
+                <Icon path={mdiPlus} size={0.9} />
+              </button>
+            </div>
+          ) : null}
+        </li>
       </ul>
 
-      <h2 className="h5 mt-4">Zprávy</h2>
+      <h2 className="h5 event-messages-title">Zprávy</h2>
+      </div>
       <MessageThread eventId={id} />
 
       <EventForm show={editOpen} onHide={() => setEditOpen(false)} event={event} onSaved={setEvent} />
+      <Modal
+        show={othersOpen}
+        onHide={() => setOthersOpen(false)}
+        animation={false}
+        scrollable
+        dialogClassName="modal-vb-fit"
+        aria-labelledby="attendees-modal-title"
+      >
+        <Modal.Header closeButton>
+          <div className="event-attendees-head event-attendees-head--modal">
+            <Modal.Title as="h2" id="attendees-modal-title">
+              Účastníci
+            </Modal.Title>
+            <span
+              className={`event-attendance event-attendance--${attendanceLevel(event.occupied)}`}
+              title="Do 5 je málo, 6–8 se dá hrát, 9 a víc je super"
+            >
+              {event.occupied} / {event.capacity}
+            </span>
+          </div>
+        </Modal.Header>
+        <Modal.Body>
+          {members.length === 0 ? (
+            <p className="mb-0 text-muted">Nikdo další zatím není.</p>
+          ) : (
+            <ul className="event-attendees event-others-list list-unstyled mb-0">
+              {members.map((row) => {
+                const name = displayName(row.userId);
+                const isMe = row.userId === user.id;
+                return (
+                  <li key={row.userId} className="event-attendee">
+                    <strong className="event-attendee-name">
+                      {attendeeCaption(name, row.status, row.guests)}
+                    </strong>
+                    <div className="event-attendee-controls">
+                      <AttendanceIcons
+                        status={row.status}
+                        name={name}
+                        disabled={rsvpDisabled}
+                        onSelect={
+                          isAdmin || isMe ? (status) => submitRsvp(row.userId, status) : undefined
+                        }
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Modal.Body>
+      </Modal>
+      <Modal
+        show={cancelOpen}
+        onHide={cancelBusy ? undefined : () => setCancelOpen(false)}
+        scrollable
+        dialogClassName="modal-vb-fit"
+      >
+        <Modal.Header closeButton={!cancelBusy}>
+          <Modal.Title>Zrušit tento termín?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {rsvpError ? <Alert variant="danger">{rsvpError}</Alert> : null}
+          Termín „{event.name}“ se zruší. Účastníci ho uvidí jako zrušený, zprávy zůstanou.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => setCancelOpen(false)}
+            disabled={cancelBusy}
+          >
+            Ponechat
+          </Button>
+          <Button variant="danger" onClick={confirmCancel} disabled={cancelBusy}>
+            {cancelBusy ? <Spinner animation="border" size="sm" className="me-2" /> : null}
+            Zrušit termín
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 }

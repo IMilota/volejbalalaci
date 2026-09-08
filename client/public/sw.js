@@ -40,7 +40,7 @@ self.addEventListener("notificationclick", (event) => {
   const data = event.notification.data || {};
   let path = "/";
   if (data.type === "message" && (data.eventId == null || data.eventId === "")) {
-    path = "/board";
+    path = "/events";
   } else if (data.type === "message" && data.eventId) {
     path = "/events/" + data.eventId;
   } else if (data.type === "reminder" && data.eventId) {

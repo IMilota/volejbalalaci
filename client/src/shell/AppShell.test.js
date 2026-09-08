@@ -27,7 +27,10 @@ function mockPushEnvironment({ subscription = null } = {}) {
   return { getSubscription, subscribe };
 }
 
+const originalMatchMedia = window.matchMedia;
+
 afterEach(() => {
+  window.matchMedia = originalMatchMedia;
   clearStashedInstallPrompt();
 });
 
@@ -56,6 +59,11 @@ test("admin sees Členové", () => {
   expect(screen.getByRole("link", { name: /členové/i })).toHaveAttribute("href", "/users");
 });
 
+test("does not show Nástěnka", () => {
+  renderShell("admin");
+  expect(screen.queryByRole("link", { name: /nástěnka/i })).not.toBeInTheDocument();
+});
+
 test("without vapidPublicKey, Zapnout oznámení is absent", () => {
   renderShell("user", { instanceName: "Volejbalaláci", vapidPublicKey: null });
   expect(screen.queryByText(/zapnout oznámení/i)).not.toBeInTheDocument();
@@ -73,12 +81,6 @@ test("Nainstalovat is absent until beforeinstallprompt", () => {
 });
 
 test("Nainstalovat appears when beforeinstallprompt fired before render", () => {
-  window.matchMedia = jest.fn().mockImplementation((query) => ({
-    matches: false,
-    media: query,
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-  }));
   const event = new Event("beforeinstallprompt");
   event.prompt = jest.fn().mockResolvedValue(undefined);
   window.dispatchEvent(event);
@@ -87,12 +89,6 @@ test("Nainstalovat appears when beforeinstallprompt fired before render", () => 
 });
 
 test("Nainstalovat appears after beforeinstallprompt when not standalone", async () => {
-  window.matchMedia = jest.fn().mockImplementation((query) => ({
-    matches: query === "(display-mode: standalone)" ? false : false,
-    media: query,
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-  }));
   renderShell("user");
   const event = new Event("beforeinstallprompt");
   event.prompt = jest.fn().mockResolvedValue(undefined);
@@ -105,4 +101,26 @@ test("Nainstalovat appears after beforeinstallprompt when not standalone", async
   await waitFor(() =>
     expect(screen.queryByRole("button", { name: /nainstalovat/i })).not.toBeInTheDocument()
   );
+});
+
+test("hamburger opens an offcanvas menu", () => {
+  renderShell("user");
+  fireEvent.click(screen.getByRole("button", { name: /toggle navigation/i }));
+  expect(screen.getByRole("dialog", { name: /volejbalaláci/i })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /nejbližší událost/i })).toBeVisible();
+  expect(screen.getByRole("link", { name: /nejbližší událost/i })).toHaveAttribute("href", "/");
+  expect(screen.getByRole("link", { name: /termíny/i })).toBeVisible();
+});
+
+test("brand and nearest-event menu item go home", () => {
+  renderShell("user");
+  const brandLinks = screen.getAllByRole("link", { name: /volejbalaláci/i });
+  expect(brandLinks.length).toBeGreaterThanOrEqual(1);
+  brandLinks.forEach((link) => expect(link).toHaveAttribute("href", "/"));
+  expect(screen.getByRole("link", { name: /nejbližší událost/i })).toHaveAttribute("href", "/");
+});
+
+test("navbar is fixed to the top", () => {
+  renderShell("user");
+  expect(screen.getByRole("navigation")).toHaveClass("fixed-top");
 });

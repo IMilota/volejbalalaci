@@ -123,7 +123,12 @@ export default function EventForm({ show, onHide, event, onSaved }) {
   }
 
   return (
-    <Modal show={show} onHide={busy ? undefined : onHide}>
+    <Modal
+      show={show}
+      onHide={busy ? undefined : onHide}
+      scrollable
+      dialogClassName="modal-vb-fit"
+    >
       <Form onSubmit={handleSubmit}>
         <Modal.Header closeButton={!busy}>
           <Modal.Title>{editing ? "Upravit událost" : "Nová událost"}</Modal.Title>

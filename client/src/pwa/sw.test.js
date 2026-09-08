@@ -41,10 +41,10 @@ function clickNotification(listeners, data) {
   return waitUntil;
 }
 
-test("message with null eventId opens /board", () => {
+test("message with null eventId opens /events", () => {
   const { listeners, openWindow } = loadServiceWorker();
   clickNotification(listeners, { type: "message", eventId: null });
-  expect(openWindow).toHaveBeenCalledWith("/board");
+  expect(openWindow).toHaveBeenCalledWith("/events");
 });
 
 test("message with eventId opens /events/:id", () => {

@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Alert from "react-bootstrap/Alert";
 import Button from "react-bootstrap/Button";
+import Dropdown from "react-bootstrap/Dropdown";
 import Form from "react-bootstrap/Form";
 import Spinner from "react-bootstrap/Spinner";
+import Icon from "@mdi/react";
+import { mdiDotsVertical, mdiSend } from "@mdi/js";
 import { ApiError, api } from "../api/client";
 import { errorCopy } from "../api/error-copy";
 import { useAuth } from "../auth/AuthProvider";
 import { useUsers } from "../users/UsersProvider";
-import { groupMessages } from "./groupMessages";
+import { toChatItems } from "./groupMessages";
 
 function loadMessage(err) {
   if (err instanceof ApiError) {
@@ -34,6 +37,10 @@ function formatStamp(iso) {
   }).format(new Date(iso));
 }
 
+function threadRootId(message) {
+  return message.replyToId || message.id;
+}
+
 export default function MessageThread({ eventId }) {
   const { user } = useAuth();
   const { displayName } = useUsers();
@@ -43,9 +50,8 @@ export default function MessageThread({ eventId }) {
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [replyToId, setReplyToId] = useState(null);
-  const [replyDraft, setReplyDraft] = useState("");
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState("");
+  const logRef = useRef(null);
 
   const load = useCallback(async ({ silent } = {}) => {
     if (!silent) {
@@ -86,7 +92,7 @@ export default function MessageThread({ eventId }) {
     return payload;
   }
 
-  async function handlePost(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const body = draft.trim();
     if (!body || busy) {
@@ -95,51 +101,15 @@ export default function MessageThread({ eventId }) {
     setBusy(true);
     setError(null);
     try {
-      await api("/api/messages", { method: "POST", body: postPayload(body) });
+      if (editingId) {
+        await api(`/api/messages/${editingId}`, { method: "PATCH", body: { body } });
+        setEditingId(null);
+      } else {
+        const extra = replyToId ? { replyToId } : {};
+        await api("/api/messages", { method: "POST", body: postPayload(body, extra) });
+        setReplyToId(null);
+      }
       setDraft("");
-      await load({ silent: true });
-    } catch (err) {
-      setError(loadMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleReply(event) {
-    event.preventDefault();
-    const body = replyDraft.trim();
-    if (!body || !replyToId || busy) {
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await api("/api/messages", {
-        method: "POST",
-        body: postPayload(body, { replyToId }),
-      });
-      setReplyDraft("");
-      setReplyToId(null);
-      await load({ silent: true });
-    } catch (err) {
-      setError(loadMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handlePatch(event) {
-    event.preventDefault();
-    const body = editDraft.trim();
-    if (!body || !editingId || busy) {
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await api(`/api/messages/${editingId}`, { method: "PATCH", body: { body } });
-      setEditingId(null);
-      setEditDraft("");
       await load({ silent: true });
     } catch (err) {
       setError(loadMessage(err));
@@ -164,156 +134,160 @@ export default function MessageThread({ eventId }) {
     }
   }
 
-  const { roots, repliesByParent } = groupMessages(messages);
+  const items = toChatItems(messages);
+  const replyTarget = messages.find((item) => item.id === replyToId) || null;
+  const editingTarget = messages.find((item) => item.id === editingId) || null;
 
-  function renderMessage(message, isReply) {
-    const editing = editingId === message.id;
-    const managing = canManage(message);
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [messages, loading]);
 
-    return (
-      <div key={message.id} className={isReply ? "ps-4 border-start mb-2" : "mb-2"}>
-        <div className="d-flex justify-content-between gap-2 flex-wrap">
-          <strong>{displayName(authorIdOf(message))}</strong>
-          <span className="text-muted small">{formatStamp(message.createdAt)}</span>
-        </div>
-        {editing ? (
-          <Form onSubmit={handlePatch} className="mt-2">
-            <Form.Control
-              as="textarea"
-              rows={2}
-              maxLength={2000}
-              value={editDraft}
-              disabled={busy}
-              onChange={(e) => setEditDraft(e.target.value)}
-            />
-            <div className="d-flex gap-2 mt-2">
-              <Button type="submit" size="sm" disabled={busy || !editDraft.trim()}>
-                {busy ? <Spinner animation="border" size="sm" className="me-2" /> : null}
-                Uložit
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline-secondary"
-                disabled={busy}
-                onClick={() => {
-                  setEditingId(null);
-                  setEditDraft("");
-                }}
-              >
-                Zavřít
-              </Button>
-            </div>
-          </Form>
-        ) : (
-          <p className="mb-1">{message.body}</p>
-        )}
-        {!editing ? (
-          <div className="d-flex gap-2 flex-wrap">
-            {!isReply ? (
-              <Button
-                size="sm"
-                variant="outline-primary"
-                disabled={busy}
-                onClick={() => {
-                  setReplyToId(message.id);
-                  setReplyDraft("");
-                }}
-              >
-                Odpovědět
-              </Button>
-            ) : null}
-            {managing ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline-primary"
-                  disabled={busy}
-                  onClick={() => {
-                    setEditingId(message.id);
-                    setEditDraft(message.body);
-                  }}
-                >
-                  Upravit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  disabled={busy}
-                  onClick={() => handleDelete(message)}
-                >
-                  Smazat
-                </Button>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-        {!isReply && replyToId === message.id ? (
-          <Form onSubmit={handleReply} className="mt-2 ps-4">
-            <Form.Control
-              as="textarea"
-              rows={2}
-              maxLength={2000}
-              value={replyDraft}
-              disabled={busy}
-              placeholder="Odpověď"
-              onChange={(e) => setReplyDraft(e.target.value)}
-            />
-            <div className="d-flex gap-2 mt-2">
-              <Button type="submit" size="sm" disabled={busy || !replyDraft.trim()}>
-                {busy ? <Spinner animation="border" size="sm" className="me-2" /> : null}
-                Odeslat
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline-secondary"
-                disabled={busy}
-                onClick={() => {
-                  setReplyToId(null);
-                  setReplyDraft("");
-                }}
-              >
-                Zavřít
-              </Button>
-            </div>
-          </Form>
-        ) : null}
-      </div>
-    );
+  function cancelCompose() {
+    if (editingId) {
+      setDraft("");
+    }
+    setReplyToId(null);
+    setEditingId(null);
   }
 
   return (
-    <div>
+    <div className="chat-thread">
       {error ? <Alert variant="danger">{error}</Alert> : null}
-      {loading ? (
-        <div className="d-flex justify-content-center py-4">
-          <Spinner animation="border" />
-        </div>
-      ) : (
-        roots.map((root) => (
-          <div key={root.id} className="border-bottom pb-2 mb-3">
-            {renderMessage(root, false)}
-            {(repliesByParent[root.id] || []).map((reply) => renderMessage(reply, true))}
+      <div className="chat-log" ref={logRef}>
+        {loading ? (
+          <div className="d-flex justify-content-center py-4">
+            <Spinner animation="border" />
           </div>
-        ))
-      )}
-      <Form onSubmit={handlePost}>
-        <Form.Group className="mb-2" controlId={`message-body-${eventId || "board"}`}>
-          <Form.Label>Nová zpráva</Form.Label>
-          <Form.Control
-            as="textarea"
-            rows={3}
-            maxLength={2000}
-            value={draft}
-            disabled={busy}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-        </Form.Group>
-        <Button type="submit" disabled={busy || !draft.trim()}>
-          {busy ? <Spinner animation="border" size="sm" className="me-2" /> : null}
-          Odeslat
-        </Button>
+        ) : (
+          items.map(({ message, parent }) => {
+            const mine = user?.id === authorIdOf(message);
+            const managing = canManage(message);
+            return (
+              <article
+                key={message.id}
+                className={`chat-msg${mine ? " chat-msg--mine" : ""}`}
+              >
+                {parent ? (
+                  <div className="chat-msg-quote">
+                    <span className="chat-msg-quote-author">{displayName(authorIdOf(parent))}</span>
+                    {parent.body}
+                  </div>
+                ) : null}
+                <div className="chat-msg-top">
+                  <div className="chat-msg-meta">
+                    <strong>{displayName(authorIdOf(message))}</strong>
+                    <span className="chat-msg-time">{formatStamp(message.createdAt)}</span>
+                  </div>
+                  <Dropdown align="end" className="chat-msg-menu">
+                    <Dropdown.Toggle
+                      variant="link"
+                      className="chat-msg-menu-btn"
+                      aria-label="Akce ke zprávě"
+                      disabled={busy}
+                    >
+                      <Icon path={mdiDotsVertical} size={0.85} />
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu>
+                      <Dropdown.Item
+                        as="button"
+                        onClick={() => {
+                          setReplyToId(threadRootId(message));
+                          setEditingId(null);
+                        }}
+                      >
+                        Odpovědět
+                      </Dropdown.Item>
+                      {managing ? (
+                        <>
+                          <Dropdown.Item
+                            as="button"
+                            onClick={() => {
+                              setEditingId(message.id);
+                              setDraft(message.body);
+                              setReplyToId(null);
+                            }}
+                          >
+                            Upravit
+                          </Dropdown.Item>
+                          <Dropdown.Item
+                            as="button"
+                            className="text-danger"
+                            onClick={() => handleDelete(message)}
+                          >
+                            Smazat
+                          </Dropdown.Item>
+                        </>
+                      ) : null}
+                    </Dropdown.Menu>
+                  </Dropdown>
+                </div>
+                <p className="chat-msg-body mb-0">{message.body}</p>
+              </article>
+            );
+          })
+        )}
+      </div>
+      <Form onSubmit={handleSubmit} className="chat-compose">
+        {editingTarget ? (
+          <div className="chat-compose-reply">
+            <div className="chat-msg-quote mb-0">
+              <span className="chat-msg-quote-author">Úprava</span>
+            </div>
+            <Button
+              type="button"
+              variant="link"
+              className="chat-compose-reply-close"
+              aria-label="Zrušit úpravu"
+              disabled={busy}
+              onClick={cancelCompose}
+            >
+              ×
+            </Button>
+          </div>
+        ) : replyTarget ? (
+          <div className="chat-compose-reply">
+            <div className="chat-msg-quote mb-0">
+              <span className="chat-msg-quote-author">{displayName(authorIdOf(replyTarget))}</span>
+              {replyTarget.body}
+            </div>
+            <Button
+              type="button"
+              variant="link"
+              className="chat-compose-reply-close"
+              aria-label="Zrušit odpověď"
+              disabled={busy}
+              onClick={cancelCompose}
+            >
+              ×
+            </Button>
+          </div>
+        ) : null}
+        <div className="chat-compose-row">
+          <Form.Group className="mb-0 flex-grow-1" controlId={`message-body-${eventId || "board"}`}>
+            <Form.Label visuallyHidden>Zpráva</Form.Label>
+            <Form.Control
+              type="text"
+              maxLength={2000}
+              value={draft}
+              disabled={busy}
+              autoComplete="off"
+              placeholder={editingTarget ? "Upravit zprávu" : "Napsat zprávu"}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+          </Form.Group>
+          <Button
+            type="submit"
+            className="chat-compose-send"
+            aria-label="Odeslat"
+            title="Odeslat"
+            disabled={busy || !draft.trim()}
+          >
+            {busy ? <Spinner animation="border" size="sm" /> : <Icon path={mdiSend} size={0.85} />}
+          </Button>
+        </div>
       </Form>
     </div>
   );

@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build:frontend": "BUILD_PATH=../server/dist npm --prefix ../client run build",
     "start": "node app.js",
     "test": "node --test --test-concurrency=1 test/**/*.test.js"
   },

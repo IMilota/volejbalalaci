@@ -60,6 +60,9 @@ test("create omits empty description", async () => {
   renderForm();
 
   const dialog = await screen.findByRole("dialog");
+  const frame = dialog.querySelector(".modal-dialog") ?? dialog;
+  expect(frame).toHaveClass("modal-vb-fit");
+  expect(frame).toHaveClass("modal-dialog-scrollable");
   fireEvent.change(within(dialog).getByLabelText("Název"), { target: { value: "Nová" } });
   fireEvent.change(within(dialog).getByLabelText("Začátek"), {
     target: { value: "2030-01-08T18:00" },

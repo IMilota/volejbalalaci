@@ -20,7 +20,7 @@ Replace the broken CRA client (file-DAO URLs, impersonation dropdown, `userMap` 
 
 ## Architecture
 
-Keep `client/` CRA (`proxy`: `http://localhost:3111`). One app: delete the leftover Celoškovi shell (`App.js` dual navbar, root `user-provider.js` `/login` nickname POST).
+Keep `client/` CRA (`proxy`: `http://localhost:3111` for HMR). Production and `server` `npm start` host the CRA build from `server/dist` (same origin as `/api`). One app: delete the leftover Celoškovi shell (`App.js` dual navbar, root `user-provider.js` `/login` nickname POST).
 
 | Unit | Responsibility |
 |---|---|

@@ -114,6 +114,34 @@ describe("events", () => {
     );
   });
 
+  it("GET /api/events includes myStatus for the current user", async () => {
+    const { user, token } = await makeUser();
+    const going = await Event.create({
+      name: "Going",
+      startAt: new Date(Date.now() + 24 * 3600 * 1000),
+      endAt: new Date(Date.now() + 26 * 3600 * 1000),
+      location: "Hala",
+      capacity: 12,
+    });
+    await Event.create({
+      name: "Unset",
+      startAt: new Date(Date.now() + 48 * 3600 * 1000),
+      endAt: new Date(Date.now() + 50 * 3600 * 1000),
+      location: "Hala",
+      capacity: 12,
+    });
+    await Attendance.create({
+      eventId: going._id,
+      userId: user._id,
+      status: "yes",
+    });
+    const res = await request(app).get("/api/events").set(bearer(token));
+    assert.equal(res.status, 200);
+    const byName = Object.fromEntries(res.body.map((event) => [event.name, event]));
+    assert.equal(byName.Going.myStatus, "yes");
+    assert.equal(byName.Unset.myStatus, null);
+  });
+
   it("GET with invalid from date returns 400 dtoInIsNotValid", async () => {
     const { token } = await makeAdmin();
     const res = await request(app)
@@ -163,6 +191,7 @@ describe("events", () => {
     assert.equal(res.body.id, String(event._id));
     assert.equal(res.body.occupied, 0);
     assert.equal(res.body.attendanceList, undefined);
+    assert.equal(res.body.myStatus, null);
   });
 
   it("GET unknown event returns 404 eventNotFound", async () => {

@@ -15,6 +15,25 @@ async function withOccupied(event) {
   return { ...event.toJSON(), occupied: await Attendance.occupiedSeats(event._id) };
 }
 
+async function withOccupiedAndMine(events, userId) {
+  const mine = await Attendance.find({
+    userId,
+    eventId: { $in: events.map((event) => event._id) },
+  }).lean();
+  const statusByEvent = new Map(mine.map((row) => [String(row.eventId), row.status]));
+  return Promise.all(
+    events.map(async (event) => ({
+      ...(await withOccupied(event)),
+      myStatus: statusByEvent.get(String(event._id)) ?? null,
+    }))
+  );
+}
+
+async function withOccupiedAndMineOne(event, userId) {
+  const [row] = await withOccupiedAndMine([event], userId);
+  return row;
+}
+
 function parseQueryDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -44,7 +63,7 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const events = await Event.find(startAtQuery(req.query)).sort({ startAt: 1 });
-    res.json(await Promise.all(events.map(withOccupied)));
+    res.json(await withOccupiedAndMine(events, req.user._id));
   })
 );
 
@@ -88,7 +107,7 @@ router.get(
     if (!event) {
       return sendError(res, 404, "eventNotFound", "event not found");
     }
-    res.json(await withOccupied(event));
+    res.json(await withOccupiedAndMineOne(event, req.user._id));
   })
 );
 
@@ -107,7 +126,7 @@ router.patch(
       }
     }
     await event.save();
-    res.json(await withOccupied(event));
+    res.json(await withOccupiedAndMineOne(event, req.user._id));
   })
 );
 
@@ -121,7 +140,7 @@ router.post(
     }
     event.status = "cancelled";
     await event.save();
-    res.json(await withOccupied(event));
+    res.json(await withOccupiedAndMineOne(event, req.user._id));
   })
 );
 

@@ -1,4 +1,6 @@
 const express = require("express");
+const fs = require("fs/promises");
+const path = require("path");
 const cors = require("cors");
 const { connectDb } = require("./db/connect");
 const { seedAdmin } = require("./db/seed-admin");
@@ -20,13 +22,17 @@ const { runAttendanceReminders } = require("./services/reminders");
 const app = express();
 const port = process.env.PORT || 3111;
 
+function frontendDistDir() {
+  return path.resolve(process.env.FRONTEND_DIST_DIR || path.join(__dirname, "dist"));
+}
+
+function frontendIndexPath() {
+  return path.join(frontendDistDir(), "index.html");
+}
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
-
-app.get("/", (req, res) => {
-  res.send("Volejbalalaci");
-});
 
 app.use("/api/config", configRouter);
 app.use("/api/auth", authRouter);
@@ -40,6 +46,20 @@ app.use("/api/messages", messagesRouter);
 app.use("/api/events/:eventId/rides", eventRidesRouter);
 app.use("/api/rides", ridesRouter);
 app.use("/api/push", pushRouter);
+
+app.use((req, res, next) => {
+  express.static(frontendDistDir())(req, res, next);
+});
+
+app.get(/^\/(?!api).*/, async (_req, res) => {
+  const indexPath = frontendIndexPath();
+  try {
+    await fs.access(indexPath);
+    res.sendFile(indexPath);
+  } catch {
+    res.status(503).send("Frontend is not built. Run: npm run build:frontend (inside server).");
+  }
+});
 
 app.use((err, req, res, next) => {
   const mapped = mapMongoError(err);

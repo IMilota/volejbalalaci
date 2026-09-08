@@ -68,16 +68,34 @@ test("non-admin sees permission copy and not the table", async () => {
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });
 
-test("admin sees member table", async () => {
+test("admin sees members as cards, not a table", async () => {
   setRole("admin");
   api.mockResolvedValue([adminUser, memberUser]);
   renderPage();
-  await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
-  expect(screen.getByText("Ivo")).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByText("Ivo")).toBeInTheDocument());
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
   expect(screen.getByText("ivo")).toBeInTheDocument();
   expect(screen.getByText("ivo@x.cz")).toBeInTheDocument();
   expect(screen.getByText("Alena")).toBeInTheDocument();
   expect(api).toHaveBeenCalledWith("/api/users");
+});
+
+test("account type is an icon next to edit, not a text line", async () => {
+  setRole("admin");
+  api.mockResolvedValue([adminUser, memberUser]);
+  renderPage();
+  await waitFor(() => expect(screen.getByText("ivo@x.cz")).toBeInTheDocument());
+  const adminCard = screen.getByText("ivo@x.cz").closest(".member-card");
+  const memberCard = screen.getByText("alena@x.cz").closest(".member-card");
+  expect(within(adminCard).getByRole("img", { name: "správce" })).toBeInTheDocument();
+  expect(within(memberCard).getByRole("img", { name: "člen" })).toBeInTheDocument();
+  expect(within(adminCard).queryByText("správce")).not.toBeInTheDocument();
+  expect(within(memberCard).queryByText("člen")).not.toBeInTheDocument();
+  const tools = adminCard.querySelector(".event-header-tools");
+  const roleIcon = within(adminCard).getByRole("img", { name: "správce" });
+  const edit = within(adminCard).getByRole("button", { name: /upravit/i });
+  expect(tools.contains(roleIcon)).toBe(true);
+  expect(tools.contains(edit)).toBe(true);
 });
 
 test("admin can create a member", async () => {
@@ -104,6 +122,10 @@ test("admin can create a member", async () => {
   await waitFor(() => expect(screen.getByText("Ivo")).toBeInTheDocument());
   fireEvent.click(screen.getByRole("button", { name: /nový člen/i }));
   const dialog = await screen.findByRole("dialog");
+  const frame = dialog.querySelector(".modal-dialog") ?? dialog;
+  expect(frame).toHaveClass("modal-vb-fit");
+  expect(frame).toHaveClass("modal-dialog-scrollable");
+  expect(frame.className).not.toMatch(/modal-fullscreen/);
   fireEvent.change(within(dialog).getByLabelText("Jméno"), { target: { value: "Nový" } });
   fireEvent.change(within(dialog).getByLabelText("Přezdívka"), { target: { value: "novy" } });
   fireEvent.change(within(dialog).getByLabelText("E-mail"), { target: { value: "novy@x.cz" } });
@@ -138,8 +160,8 @@ test("admin can edit a member", async () => {
   });
   renderPage();
   await waitFor(() => expect(screen.getByText("Alena")).toBeInTheDocument());
-  const row = screen.getByText("alena@x.cz").closest("tr");
-  fireEvent.click(within(row).getByRole("button", { name: /upravit/i }));
+  const card = screen.getByText("alena@x.cz").closest(".member-card");
+  fireEvent.click(within(card).getByRole("button", { name: /upravit/i }));
   const dialog = await screen.findByRole("dialog");
   fireEvent.change(within(dialog).getByLabelText("Jméno"), { target: { value: "Alena Nová" } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Uložit" }));
@@ -188,8 +210,8 @@ test("last remaining admin cannot be demoted", async () => {
   api.mockResolvedValue([adminUser, memberUser]);
   renderPage();
   await waitFor(() => expect(screen.getByText("Ivo")).toBeInTheDocument());
-  const adminRow = screen.getByText("ivo@x.cz").closest("tr");
-  fireEvent.click(within(adminRow).getByRole("button", { name: /upravit/i }));
+  const adminCard = screen.getByText("ivo@x.cz").closest(".member-card");
+  fireEvent.click(within(adminCard).getByRole("button", { name: /upravit/i }));
   const dialog = await screen.findByRole("dialog");
   expect(within(dialog).getByLabelText("Role")).toBeDisabled();
 });
@@ -198,7 +220,7 @@ test("has no delete user control", async () => {
   setRole("admin");
   api.mockResolvedValue([adminUser, memberUser]);
   renderPage();
-  await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("Ivo")).toBeInTheDocument());
   expect(screen.queryByRole("button", { name: /smazat|odebrat/i })).not.toBeInTheDocument();
 });
 

@@ -1,18 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
+import { attendeeLabel } from "./label";
 
 const UsersContext = createContext(null);
-
-function labelFor(user, id) {
-  if (user?.name) {
-    return user.name;
-  }
-  if (user?.nickname) {
-    return user.nickname;
-  }
-  return String(id || "").slice(0, 8);
-}
 
 async function fetchUsers() {
   const data = await api("/api/users");
@@ -56,7 +47,7 @@ export function UsersProvider({ children }) {
   const displayName = useCallback(
     (id) => {
       const user = users.find((item) => item.id === id);
-      return labelFor(user, id);
+      return attendeeLabel(user, id);
     },
     [users]
   );

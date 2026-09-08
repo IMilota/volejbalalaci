@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Alert from "react-bootstrap/Alert";
 import Button from "react-bootstrap/Button";
+import Card from "react-bootstrap/Card";
 import Container from "react-bootstrap/Container";
 import Form from "react-bootstrap/Form";
 import Modal from "react-bootstrap/Modal";
 import Spinner from "react-bootstrap/Spinner";
-import Table from "react-bootstrap/Table";
+import Icon from "@mdi/react";
+import { mdiAccountOutline, mdiPencil, mdiPlus, mdiShieldAccount } from "@mdi/js";
 import { ApiError, api } from "../api/client";
 import { errorCopy } from "../api/error-copy";
 import { useAuth } from "../auth/AuthProvider";
@@ -34,6 +36,10 @@ function loadError(err) {
 
 function roleLabel(role) {
   return role === "admin" ? "správce" : "člen";
+}
+
+function roleIcon(role) {
+  return role === "admin" ? mdiShieldAccount : mdiAccountOutline;
 }
 
 function MemberForm({ show, member, lastAdminLocked, onHide, onSaved }) {
@@ -88,7 +94,12 @@ function MemberForm({ show, member, lastAdminLocked, onHide, onSaved }) {
   }
 
   return (
-    <Modal show={show} onHide={busy ? undefined : onHide}>
+    <Modal
+      show={show}
+      onHide={busy ? undefined : onHide}
+      scrollable
+      dialogClassName="modal-vb-fit"
+    >
       <Form onSubmit={handleSubmit}>
         <Modal.Header closeButton={!busy}>
           <Modal.Title>{editing ? "Upravit člena" : "Nový člen"}</Modal.Title>
@@ -198,14 +209,20 @@ export default function UsersPage() {
     <Container className="pb-4">
       <div className="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
         <h1 className="h3 mb-0">Členové</h1>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        >
-          Nový člen
-        </Button>
+        <div className="event-header-tools">
+          <Button
+            variant="outline-primary"
+            size="sm"
+            aria-label="Nový člen"
+            title="Nový člen"
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            <Icon path={mdiPlus} size={0.85} />
+          </Button>
+        </div>
       </div>
       {error ? <Alert variant="danger">{error}</Alert> : null}
       {loading ? (
@@ -213,39 +230,41 @@ export default function UsersPage() {
           <Spinner animation="border" />
         </div>
       ) : error ? null : (
-        <Table responsive hover>
-          <thead>
-            <tr>
-              <th>Jméno</th>
-              <th>Přezdívka</th>
-              <th>E-mail</th>
-              <th>Role</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((member) => (
-              <tr key={member.id}>
-                <td>{member.name}</td>
-                <td>{member.nickname}</td>
-                <td>{member.email}</td>
-                <td>{roleLabel(member.role)}</td>
-                <td className="text-end">
+        users.map((member) => (
+          <Card key={member.id} className="member-card mb-3">
+            <Card.Body>
+              <div className="event-card-top">
+                <Card.Title as="h2" className="event-card-title mb-0">
+                  {member.nickname}
+                </Card.Title>
+                <div className="event-header-tools">
+                  <span
+                    className={`member-role-icon${member.role === "admin" ? " member-role-icon--admin" : ""}`}
+                    role="img"
+                    aria-label={roleLabel(member.role)}
+                    title={roleLabel(member.role)}
+                  >
+                    <Icon path={roleIcon(member.role)} size={0.85} />
+                  </span>
                   <Button
-                    size="sm"
                     variant="outline-primary"
+                    size="sm"
+                    aria-label="Upravit"
+                    title="Upravit"
                     onClick={() => {
                       setEditing(member);
                       setFormOpen(true);
                     }}
                   >
-                    Upravit
+                    <Icon path={mdiPencil} size={0.85} />
                   </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+                </div>
+              </div>
+              <p className="member-card-name mb-1">{member.name}</p>
+              <p className="member-card-email mb-0">{member.email}</p>
+            </Card.Body>
+          </Card>
+        ))
       )}
       <MemberForm
         show={formOpen}
